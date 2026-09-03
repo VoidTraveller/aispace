@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 
 class UserCreate(BaseModel):
     email: EmailStr
@@ -20,3 +20,42 @@ class UserOut(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class RoomOut(BaseModel):
+    id: int
+    name: str
+    capacity: int
+    description: str | None
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+
+class BookingCreate(BaseModel):
+    room_id: int
+    title: str
+    start_time: datetime
+    end_time: datetime
+
+    @field_validator("end_time")
+    @classmethod
+    def end_after_start(cls, end_time, info):
+        start_time = info.data.get("start_time")
+        if start_time and end_time <= start_time:
+            raise ValueError("end_time must be after start_time")
+        return end_time
+
+
+class BookingOut(BaseModel):
+    id: int
+    room_id: int
+    user_id: int
+    title: str
+    start_time: datetime
+    end_time: datetime
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
