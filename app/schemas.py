@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, ConfigDict, field_validator
 
 class UserCreate(BaseModel):
     email: EmailStr
@@ -14,8 +14,7 @@ class UserOut(BaseModel):
     last_name: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class Token(BaseModel):
     access_token: str
@@ -29,8 +28,7 @@ class RoomOut(BaseModel):
     description: str | None
     is_active: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class BookingCreate(BaseModel):
@@ -57,5 +55,4 @@ class BookingOut(BaseModel):
     end_time: datetime
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
