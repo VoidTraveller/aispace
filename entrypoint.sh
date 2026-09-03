@@ -17,5 +17,8 @@ echo "Postgres is ready."
 echo "Running migrations..."
 python -m alembic upgrade head
 
+echo "Seeding rooms..."
+python -m app.seed
+
 echo "Starting server..."
 exec uvicorn app.main:app --host 0.0.0.0 --port 8000
