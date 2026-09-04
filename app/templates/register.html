@@ -6,17 +6,20 @@
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <h1>Регистрация</h1>
-    <form id="register-form">
-        <input type="text" id="register-first-name" placeholder="Имя" required>
-        <input type="text" id="register-last-name" placeholder="Фамилия" required>
-        <input type="email" id="register-email" placeholder="Email" required>
-        <input type="password" id="register-password" placeholder="Пароль" required>
-        <button type="submit">Зарегистрироваться</button>
-    </form>
-    <p><a href="/">Уже есть аккаунт? Войти</a></p>
-    <div id="error-message" style="color:red;"></div>
-
+    <main>
+        <section class="card auth-card">
+            <h2>Регистрация</h2>
+            <form id="register-form">
+                <input type="text" id="register-first-name" placeholder="Имя" required>
+                <input type="text" id="register-last-name" placeholder="Фамилия" required>
+                <input type="email" id="register-email" placeholder="Email" required>
+                <input type="password" id="register-password" placeholder="Пароль" required>
+                <button type="submit" class="btn-primary">Зарегистрироваться</button>
+            </form>
+            <p class="muted"><a href="/">Уже есть аккаунт? Войти</a></p>
+            <div id="error-message" class="error"></div>
+        </section>
+    </main>
     <script src="/static/register.js"></script>
 </body>
 </html>

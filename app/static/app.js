@@ -5,6 +5,14 @@ function clearToken() { localStorage.removeItem('token'); }
 function showError(message) { document.getElementById('error-message').textContent = message; }
 function clearError() { document.getElementById('error-message').textContent = ''; }
 
+function formatError(err, fallback) {
+    const detail = err && err.detail;
+    if (!detail) return fallback;
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) return detail.map((d) => d.msg || JSON.stringify(d)).join('; ');
+    return fallback;
+}
+
 async function authFetch(url, options = {}) {
     options.headers = options.headers || {};
     options.headers['Authorization'] = `Bearer ${getToken()}`;
@@ -44,7 +52,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
 
     if (!response.ok) {
         const err = await response.json();
-        showError(err.detail || 'Ошибка входа');
+        showError(formatError(err, 'Ошибка входа'));
         return;
     }
 
@@ -69,7 +77,10 @@ async function loadRooms() {
 
     rooms.forEach((room) => {
         const li = document.createElement('li');
-        li.textContent = `${room.name} (вместимость: ${room.capacity})` + (room.is_active ? '' : ' — недоступна');
+        li.className = 'list-item';
+        const badgeClass = room.is_active ? 'badge-success' : 'badge-muted';
+        const badgeText = room.is_active ? 'доступна' : 'недоступна';
+        li.innerHTML = `<span>${room.name} · вместимость ${room.capacity}</span><span class="badge ${badgeClass}">${badgeText}</span>`;
         list.appendChild(li);
 
         if (room.is_active) {
@@ -90,9 +101,16 @@ async function loadBookings() {
 
     bookings.forEach((booking) => {
         const li = document.createElement('li');
-        li.textContent = `${booking.title}: ${booking.start_time} — ${booking.end_time} (комната ${booking.room_id}) `;
+        li.className = 'list-item';
+
+        const start = new Date(booking.start_time).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+        const end = new Date(booking.end_time).toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
+        const info = document.createElement('span');
+        info.textContent = `${booking.title} · ${start}–${end}`;
 
         const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'btn-danger';
         deleteBtn.textContent = 'Отменить';
         deleteBtn.addEventListener('click', async () => {
             const res = await authFetch(`/bookings/${booking.id}`, { method: 'DELETE' });
@@ -100,35 +118,81 @@ async function loadBookings() {
                 loadBookings();
             } else {
                 const err = await res.json();
-                showError(err.detail || 'Не удалось отменить бронь');
+                showError(formatError(err, 'Не удалось отменить бронь'));
             }
         });
+        li.appendChild(info);
         li.appendChild(deleteBtn);
         list.appendChild(li);
     });
+}
+
+// most bookings are same-day, so default the end date to match the start date
+document.getElementById('booking-start-date').addEventListener('change', () => {
+    document.getElementById('booking-end-date').value = document.getElementById('booking-start-date').value;
+});
+
+// Formats a Date using its LOCAL year/month/day -- never use toISOString() for this,
+// since that converts to UTC first and silently shifts the date by a day in any
+// timezone ahead of UTC (exactly the bug that caused 11 Sep to come out as 10 Sep).
+function formatLocalDate(date) {
+    const y = date.getFullYear();
+    const m = (date.getMonth() + 1).toString().padStart(2, '0');
+    const d = date.getDate().toString().padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+// list of YYYY-MM-DD strings for every day from startDateStr to endDateStr, inclusive.
+// Used to turn "10:00-15:00, 4 Sep - 7 Sep" into 4 separate same-time daily bookings,
+// rather than one continuous multi-day block that would (wrongly) occupy the room
+// overnight too.
+function dateRange(startDateStr, endDateStr) {
+    const dates = [];
+    const current = new Date(`${startDateStr}T00:00:00`);
+    const end = new Date(`${endDateStr}T00:00:00`);
+    while (current <= end) {
+        dates.push(formatLocalDate(current));
+        current.setDate(current.getDate() + 1);
+    }
+    return dates;
 }
 
 document.getElementById('booking-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     clearError();
 
-    const payload = {
-        room_id: parseInt(document.getElementById('booking-room').value, 10),
-        title: document.getElementById('booking-title').value,
-        start_time: document.getElementById('booking-start').value,
-        end_time: document.getElementById('booking-end').value,
-    };
+    const startDate = document.getElementById('booking-start-date').value;
+    const endDate = document.getElementById('booking-end-date').value;
+    const startTime = document.getElementById('booking-start-time').value;
+    const endTime = document.getElementById('booking-end-time').value;
+    const roomId = parseInt(document.getElementById('booking-room').value, 10);
+    const title = document.getElementById('booking-title').value;
 
-    const response = await authFetch('/bookings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-    });
+    const days = dateRange(startDate, endDate);
+    const failures = [];
 
-    if (!response.ok) {
-        const err = await response.json();
-        showError(err.detail || 'Не удалось создать бронь');
-        return;
+    for (const day of days) {
+        const payload = {
+            room_id: roomId,
+            title: title,
+            start_time: `${day}T${startTime}`,
+            end_time: `${day}T${endTime}`,
+        };
+
+        const response = await authFetch('/bookings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            failures.push(`${day}: ${formatError(err, 'ошибка')}`);
+        }
+    }
+
+    if (failures.length > 0) {
+        showError(`Забронировано не для всех дней — ${failures.join('; ')}`);
     }
 
     document.getElementById('booking-form').reset();
@@ -148,7 +212,7 @@ document.getElementById('nl-form').addEventListener('submit', async (e) => {
 
     if (!response.ok) {
         const err = await response.json();
-        showError(err.detail || 'Не удалось создать бронь');
+        showError(formatError(err, 'Не удалось создать бронь'));
         return;
     }
 

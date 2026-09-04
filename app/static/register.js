@@ -1,3 +1,11 @@
+function formatError(err, fallback) {
+    const detail = err && err.detail;
+    if (!detail) return fallback;
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) return detail.map((d) => d.msg || JSON.stringify(d)).join('; ');
+    return fallback;
+}
+
 document.getElementById('register-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     document.getElementById('error-message').textContent = '';
@@ -17,7 +25,7 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
 
     if (!response.ok) {
         const err = await response.json();
-        document.getElementById('error-message').textContent = err.detail || 'Ошибка регистрации';
+        document.getElementById('error-message').textContent = formatError(err, 'Ошибка регистрации');
         return;
     }
 
