@@ -204,7 +204,7 @@ button {
 .alert-list { margin: 0; padding-left: 18px; }
 .alert-list li { margin: 2px 0; }
 
-#bookings-list {
+#bookings-list, #rooms-list {
     max-height: 280px;
     overflow-y: auto;
 }
