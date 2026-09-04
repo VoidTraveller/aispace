@@ -5,6 +5,32 @@ function clearToken() { localStorage.removeItem('token'); }
 function showError(message) { document.getElementById('error-message').textContent = message; }
 function clearError() { document.getElementById('error-message').textContent = ''; }
 
+// Renders a structured alert instead of one long run-on sentence -- each section
+// gets a bold title and its own bullet list. sections: [{ title, items: [...] }]
+function showErrorSections(sections) {
+    const container = document.getElementById('error-message');
+    container.textContent = '';
+    sections.forEach((section) => {
+        const block = document.createElement('div');
+        block.className = 'alert-block';
+
+        const title = document.createElement('div');
+        title.className = 'alert-title';
+        title.textContent = section.title;
+        block.appendChild(title);
+
+        const ul = document.createElement('ul');
+        ul.className = 'alert-list';
+        section.items.forEach((item) => {
+            const li = document.createElement('li');
+            li.textContent = item;
+            ul.appendChild(li);
+        });
+        block.appendChild(ul);
+        container.appendChild(block);
+    });
+}
+
 function formatError(err, fallback) {
     const detail = err && err.detail;
     if (!detail) return fallback;
@@ -235,6 +261,15 @@ document.getElementById('booking-form').addEventListener('submit', async (e) => 
     const roomId = parseInt(document.getElementById('booking-room').value, 10);
     const title = document.getElementById('booking-title').value;
 
+    // Checked once, up front: an end time not after the start time would fail
+    // identically for every single day in the range, producing a wall of repeated
+    // identical error messages. Catching it here also means we never fall through
+    // to the reset-on-failure path with nothing useful to say.
+    if (endTime <= startTime) {
+        showError('Время окончания должно быть позже времени начала');
+        return;
+    }
+
     const allDays = dateRange(startDate, endDate);
     // A single explicitly-chosen day is honored even if it's a weekend (someone doing
     // this deliberately probably has a real event that day). A multi-day RANGE that
@@ -265,15 +300,24 @@ document.getElementById('booking-form').addEventListener('submit', async (e) => 
         }
     }
 
-    const notes = [];
+    const sections = [];
     if (skipped.length > 0) {
-        notes.push(`пропущены выходные (${skipped.join(', ')})`);
+        sections.push({ title: 'Пропущены выходные дни:', items: skipped });
     }
     if (failures.length > 0) {
-        notes.push(`не удалось забронировать: ${failures.join('; ')}`);
+        sections.push({ title: 'Не удалось забронировать:', items: failures });
     }
-    if (notes.length > 0) {
-        showError(notes.join(' · '));
+
+    if (failures.length > 0) {
+        // leave the form filled in on failure -- the user shouldn't have to
+        // re-enter everything to fix and retry
+        showErrorSections(sections);
+        loadBookings();
+        return;
+    }
+
+    if (sections.length > 0) {
+        showErrorSections(sections);
     }
 
     document.getElementById('booking-form').reset();
