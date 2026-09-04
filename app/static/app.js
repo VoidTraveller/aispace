@@ -19,11 +19,19 @@ async function authFetch(url, options = {}) {
     return fetch(url, options);
 }
 
-function showApp(email) {
+let currentUser = null;
+
+async function fetchCurrentUser() {
+    const response = await authFetch('/auth/me');
+    if (!response.ok) return null;
+    return response.json();
+}
+
+function showApp() {
     document.getElementById('auth-forms').style.display = 'none';
     document.getElementById('user-info').style.display = 'block';
     document.getElementById('app-section').style.display = 'block';
-    document.getElementById('user-name').textContent = email;
+    document.getElementById('user-name').textContent = `${currentUser.first_name} ${currentUser.last_name}`;
     loadRooms();
     loadBookings();
 }
@@ -58,7 +66,8 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
 
     const data = await response.json();
     setToken(data.access_token);
-    showApp(email);
+    currentUser = await fetchCurrentUser();
+    showApp();
 });
 
 document.getElementById('logout-btn').addEventListener('click', () => {
@@ -101,28 +110,62 @@ async function loadBookings() {
 
     bookings.forEach((booking) => {
         const li = document.createElement('li');
-        li.className = 'list-item';
+        li.className = 'list-item booking-item';
 
         const start = new Date(booking.start_time).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
         const end = new Date(booking.end_time).toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 
-        const info = document.createElement('span');
-        info.textContent = `${booking.title} · ${start}–${end}`;
+        // Built with createElement/textContent throughout, never innerHTML with
+        // interpolated values -- booking.title is user-supplied and shown to every
+        // other user viewing this list, so treating it as HTML would be a stored-XSS hole.
+        const info = document.createElement('div');
+        info.className = 'booking-info';
 
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'btn-danger';
-        deleteBtn.textContent = 'Отменить';
-        deleteBtn.addEventListener('click', async () => {
-            const res = await authFetch(`/bookings/${booking.id}`, { method: 'DELETE' });
-            if (res.ok) {
-                loadBookings();
-            } else {
-                const err = await res.json();
-                showError(formatError(err, 'Не удалось отменить бронь'));
-            }
-        });
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'booking-title';
+        titleDiv.textContent = booking.title;
+
+        const metaDiv = document.createElement('div');
+        metaDiv.className = 'booking-meta';
+
+        const roomBadge = document.createElement('span');
+        roomBadge.className = 'badge badge-muted';
+        roomBadge.textContent = booking.room_name;
+
+        const userSpan = document.createElement('span');
+        userSpan.textContent = booking.user_name;
+
+        const timeSpan = document.createElement('span');
+        timeSpan.textContent = `${start}–${end}`;
+
+        metaDiv.appendChild(roomBadge);
+        metaDiv.appendChild(userSpan);
+        metaDiv.appendChild(timeSpan);
+        info.appendChild(titleDiv);
+        info.appendChild(metaDiv);
         li.appendChild(info);
-        li.appendChild(deleteBtn);
+
+        // only the booking's own owner sees a cancel button -- the backend already
+        // enforces this with a 403, but hiding the control entirely for other
+        // people's bookings is the correct UX rather than showing a button that
+        // would just fail.
+        const isOwn = currentUser && booking.user_id === currentUser.id;
+        if (isOwn) {
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'btn-danger';
+            deleteBtn.textContent = 'Отменить';
+            deleteBtn.addEventListener('click', async () => {
+                const res = await authFetch(`/bookings/${booking.id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    loadBookings();
+                } else {
+                    const err = await res.json();
+                    showError(formatError(err, 'Не удалось отменить бронь'));
+                }
+            });
+            li.appendChild(deleteBtn);
+        }
+
         list.appendChild(li);
     });
 }
@@ -258,4 +301,17 @@ document.getElementById('nl-form').addEventListener('submit', async (e) => {
     loadBookings();
 });
 
-showAuth();
+// on page load, if a token is already stored, try to restore the session instead
+// of always dropping back to the login form -- an expired/invalid token just
+// falls through to showAuth() as before.
+(async () => {
+    if (getToken()) {
+        currentUser = await fetchCurrentUser();
+        if (currentUser) {
+            showApp();
+            return;
+        }
+        clearToken();
+    }
+    showAuth();
+})();

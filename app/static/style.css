@@ -153,6 +153,21 @@ button {
 }
 .list-item:last-child { border-bottom: none; }
 
+.booking-item { align-items: flex-start; padding: 12px 0; }
+
+.booking-info { display: flex; flex-direction: column; gap: 4px; }
+
+.booking-title { font-weight: 600; }
+
+.booking-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
 .badge {
     font-size: 0.75rem;
     padding: 2px 8px;
