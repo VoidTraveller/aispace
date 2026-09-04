@@ -24,6 +24,48 @@ def test_nl_booking_success(client, room):
     assert body["end_time"] == f"{day}T15:00:00"
 
 
+def test_nl_booking_inactive_room_rejected(client, inactive_room):
+    """Defense-in-depth: DeepSeek returning an inactive room's exact name is still rejected."""
+    token = register_and_login(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    day = future_date()
+
+    fake_result = {
+        "room_query": "Test Room", "date": day,
+        "start_time": "14:00", "duration_minutes": 60, "title": "Standup",
+    }
+    with patch("app.routers.bookings.parse_booking_phrase", return_value=fake_result):
+        response = client.post("/bookings/nl", headers=headers, json={"phrase": "anything"})
+
+    assert response.status_code == 409
+
+
+def test_nl_excludes_inactive_rooms_from_deepseek_prompt(client, room):
+    """Primary defense: inactive rooms are never offered to DeepSeek as an option at all."""
+    from conftest import TestSessionLocal
+    from app.models import Room
+
+    db = TestSessionLocal()
+    db.add(Room(name="Retired Room", capacity=2, is_active=False))
+    db.commit()
+    db.close()
+
+    token = register_and_login(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    day = future_date()
+
+    fake_result = {
+        "room_query": "Test Room", "date": day,
+        "start_time": "14:00", "duration_minutes": 60, "title": "Standup",
+    }
+    with patch("app.routers.bookings.parse_booking_phrase", return_value=fake_result) as mock_parse:
+        client.post("/bookings/nl", headers=headers, json={"phrase": "anything"})
+
+    called_room_names = mock_parse.call_args[0][1]
+    assert "Retired Room" not in called_room_names
+    assert "Test Room" in called_room_names
+
+
 def test_nl_booking_deepseek_failure_returns_502(client, room):
     token = register_and_login(client)
     headers = {"Authorization": f"Bearer {token}"}
