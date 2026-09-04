@@ -28,9 +28,9 @@ def list_bookings(room_id: int | None = None, on_date: date | None = None, db: S
 def create_booking_or_409(db: Session, room_id: int, user_id: int, title: str, start_time, end_time) -> Booking:
     room = db.query(Room).filter(Room.id == room_id).first()
     if room is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Room not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Комната не найдена")
     if not room.is_active:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Room is not available for booking")
+        raise HTTPException(status.HTTP_409_CONFLICT, "Комната недоступна для бронирования")
 
     conflict = (
         db.query(Booking)
@@ -40,7 +40,7 @@ def create_booking_or_409(db: Session, room_id: int, user_id: int, title: str, s
         .first()
     )
     if conflict is not None:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Room is already booked for this time range")
+        raise HTTPException(status.HTTP_409_CONFLICT, "Комната уже забронирована на этот промежуток времени")
 
     booking = Booking(room_id=room_id, user_id=user_id, title=title, start_time=start_time, end_time=end_time)
     db.add(booking)
@@ -48,7 +48,7 @@ def create_booking_or_409(db: Session, room_id: int, user_id: int, title: str, s
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status.HTTP_409_CONFLICT, "Room is already booked for this time range")
+        raise HTTPException(status.HTTP_409_CONFLICT, "Комната уже забронирована на этот промежуток времени")
 
     db.refresh(booking)
     return booking
@@ -73,19 +73,19 @@ def delete_booking(
 ):
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
     if booking is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Booking not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Бронь не найдена")
     if booking.user_id != current_user.id:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "You can only cancel your own bookings")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Вы можете отменять только свои брони")
 
     db.delete(booking)
     db.commit()
 
 def resolve_room(db: Session, room_query: str | None) -> Room:
     if not room_query:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Could not determine which room was requested")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Не удалось определить, какая комната запрошена")
     room = db.query(Room).filter(Room.name.ilike(f"%{room_query}%")).first()
     if room is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, f"No room matching '{room_query}' found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"Комната с названием «{room_query}» не найдена")
     return room
 
 
@@ -100,38 +100,28 @@ def create_booking_nl(
     except DeepSeekParseError:
         raise HTTPException(
             status.HTTP_502_BAD_GATEWAY,
-            "Could not process the request via the AI service. Please create the booking manually instead.",
+            "Не удалось обработать запрос через ИИ-сервис. Пожалуйста, создайте бронь вручную.",
         )
-
 
     room_query = parsed.get("room_query")
     date_str = parsed.get("date")
     start_time_str = parsed.get("start_time")
     duration = parsed.get("duration_minutes")
-    title = parsed.get("title") or "Booking"
+    title = parsed.get("title") or "Бронь"
 
     if not all([room_query, date_str, start_time_str, duration]):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
-                            "Could not extract all required booking details from the phrase")
+                            "Не удалось извлечь все необходимые данные бронирования из фразы")
 
     try:
         start_dt = datetime.fromisoformat(f"{date_str}T{start_time_str}:00")
     except ValueError:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "AI service returned an unparseable date or time")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "ИИ-сервис вернул нераспознаваемую дату или время")
 
     if not isinstance(duration, int) or duration <= 0 or duration > 480:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Booking duration must be between 1 minute and 8 hours")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Длительность брони должна быть от 1 минуты до 8 часов")
 
     end_dt = start_dt + timedelta(minutes=duration)
     room = resolve_room(db, room_query)
 
     return create_booking_or_409(db, room.id, current_user.id, title, start_dt, end_dt)
-
-
-
-
-
-
-
-
-

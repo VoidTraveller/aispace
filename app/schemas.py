@@ -42,7 +42,7 @@ class BookingCreate(BaseModel):
     def end_after_start(cls, end_time, info):
         start_time = info.data.get("start_time")
         if start_time and end_time <= start_time:
-            raise ValueError("end_time must be after start_time")
+            raise ValueError("Время окончания должно быть позже времени начала")
         return end_time
 
 
