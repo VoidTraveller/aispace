@@ -31,6 +31,16 @@ class RoomOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class RoomCreate(BaseModel):
+    name: str
+    capacity: int
+    description: str | None = None
+
+
+class RoomUpdate(BaseModel):
+    is_active: bool
+
+
 class BookingCreate(BaseModel):
     room_id: int
     title: str
