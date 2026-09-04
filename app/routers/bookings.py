@@ -82,7 +82,7 @@ def delete_booking(
 
 def resolve_room(db: Session, room_query: str | None) -> Room:
     if not room_query:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Could not determine which room was requested")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Could not determine which room was requested")
     room = db.query(Room).filter(Room.name.ilike(f"%{room_query}%")).first()
     if room is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"No room matching '{room_query}' found")
@@ -111,16 +111,16 @@ def create_booking_nl(
     title = parsed.get("title") or "Booking"
 
     if not all([room_query, date_str, start_time_str, duration]):
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
                             "Could not extract all required booking details from the phrase")
 
     try:
         start_dt = datetime.fromisoformat(f"{date_str}T{start_time_str}:00")
     except ValueError:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "AI service returned an unparseable date or time")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "AI service returned an unparseable date or time")
 
     if not isinstance(duration, int) or duration <= 0 or duration > 480:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Booking duration must be between 1 minute and 8 hours")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Booking duration must be between 1 minute and 8 hours")
 
     end_dt = start_dt + timedelta(minutes=duration)
     room = resolve_room(db, room_query)
