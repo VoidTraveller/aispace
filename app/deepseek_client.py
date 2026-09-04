@@ -8,12 +8,20 @@ client = OpenAI(api_key=settings.deepseek_api_key, base_url="https://api.deepsee
 class DeepSeekParseError(Exception):
     """Raised whenever the phrase couldn't be turned into a usable booking"""
 
-def parse_booking_phrase(phrase: str) -> dict:
+def parse_booking_phrase(phrase: str, room_names: list[str]) -> dict:
     today = date.today().isoformat()
-    system_prompt = f"""Today's date is {today}. Extract booking details from the user's message
-    and respond with ONLY a JSON object with these exact keys:
-    - room_query: string, the room name/description mentioned (e.g. "большая", "маленькая")
-    - date: string, ISO format YYYY-MM-DD, resolved from any relative reference like "завтра"
+    rooms_list = ", ".join(f'"{name}"' for name in room_names)
+    system_prompt = f"""Today's date is {today}. Available meeting rooms (exact names): {rooms_list}.
+
+    Extract booking details from the user's message and respond with ONLY a JSON object
+    with these exact keys:
+    - room_query: string, must be EXACTLY one of the available room names listed above
+      that best matches what the user is referring to (match by meaning, not by literal
+      substring -- the user's phrase will use normal Russian grammar, e.g. "тихую" for
+      "Тихая комната"), or null if nothing clearly matches
+    - date: string, ISO format YYYY-MM-DD, resolved from any relative reference
+      ("завтра" = tomorrow, "послезавтра" = day after tomorrow) or weekday name
+      ("в пятницу", "на среду" = the next occurrence of that weekday on or after today)
     - start_time: string, 24h format HH:MM
     - duration_minutes: integer
     - title: string, the meeting purpose/description mentioned

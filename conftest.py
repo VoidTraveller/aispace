@@ -12,8 +12,7 @@ from app.config import settings
 from app.database import get_db
 from app.main import app
 
-# Tests run against a completely separate database, never the real app database --
-# derived from the same DATABASE_URL, just with the db name swapped.
+# separate test database, never the real one -- same DATABASE_URL, different db name
 TEST_DATABASE_URL = settings.database_url.rsplit("/", 1)[0] + "/aispace_test"
 
 test_engine = create_engine(TEST_DATABASE_URL)
@@ -21,9 +20,7 @@ TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_eng
 
 
 def _ensure_test_database_exists():
-    """Connects to the real app database just to issue CREATE DATABASE for the test
-    database (Postgres requires an existing connection to create a new database from,
-    and CREATE DATABASE can't run inside a transaction, hence autocommit)."""
+    """Creates aispace_test if missing (autocommit: CREATE DATABASE can't run in a transaction)."""
     conn = psycopg2.connect(settings.database_url)
     conn.autocommit = True
     try:
@@ -37,10 +34,7 @@ def _ensure_test_database_exists():
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_database():
-    """Runs once for the whole test session: ensures aispace_test exists, then applies
-    the real Alembic migrations to it -- same migration files as production, so the
-    schema (including the EXCLUDE constraint and btree_gist extension) is guaranteed
-    identical, not a separately hand-maintained copy."""
+    """Applies the real Alembic migrations to aispace_test, so its schema matches production exactly."""
     _ensure_test_database_exists()
     subprocess.run(
         ["python", "-m", "alembic", "upgrade", "head"],
@@ -75,10 +69,7 @@ def client():
 
 
 def future_date(days_ahead=7):
-    """A YYYY-MM-DD string always `days_ahead` days from whenever the test actually
-    runs -- never a hardcoded calendar date, since a fixed future date silently
-    becomes a past date (and now gets rejected by the past-booking check) once
-    real time catches up to it."""
+    """Relative date, not hardcoded -- a fixed date eventually becomes the past."""
     return (date.today() + timedelta(days=days_ahead)).isoformat()
 
 

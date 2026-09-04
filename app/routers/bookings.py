@@ -86,7 +86,11 @@ def delete_booking(
 def resolve_room(db: Session, room_query: str | None) -> Room:
     if not room_query:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Не удалось определить, какая комната запрошена")
-    room = db.query(Room).filter(Room.name.ilike(f"%{room_query}%")).first()
+
+    # exact match first; ILIKE is just a fallback in case DeepSeek doesn't follow instructions
+    room = db.query(Room).filter(Room.name == room_query).first()
+    if room is None:
+        room = db.query(Room).filter(Room.name.ilike(f"%{room_query}%")).first()
     if room is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"Комната с названием «{room_query}» не найдена")
     return room
@@ -98,8 +102,10 @@ def create_booking_nl(
         db: Session = Depends(get_db),
         current_user: User = Depends(get_current_user),
 ):
+    room_names = [r.name for r in db.query(Room).filter(Room.is_active == True).all()]
+
     try:
-        parsed = parse_booking_phrase(payload.phrase)
+        parsed = parse_booking_phrase(payload.phrase, room_names)
     except DeepSeekParseError:
         raise HTTPException(
             status.HTTP_502_BAD_GATEWAY,

@@ -5,8 +5,7 @@ function clearToken() { localStorage.removeItem('token'); }
 function showError(message) { document.getElementById('error-message').textContent = message; }
 function clearError() { document.getElementById('error-message').textContent = ''; }
 
-// Renders a structured alert instead of one long run-on sentence -- each section
-// gets a bold title and its own bullet list. sections: [{ title, items: [...] }]
+// sections: [{ title, items: [...] }] -- renders as titled bullet lists, not one run-on sentence
 function showErrorSections(sections) {
     const container = document.getElementById('error-message');
     container.textContent = '';
@@ -141,9 +140,7 @@ async function loadBookings() {
         const start = new Date(booking.start_time).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
         const end = new Date(booking.end_time).toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 
-        // Built with createElement/textContent throughout, never innerHTML with
-        // interpolated values -- booking.title is user-supplied and shown to every
-        // other user viewing this list, so treating it as HTML would be a stored-XSS hole.
+        // textContent, not innerHTML -- booking.title is user-supplied and shown to everyone
         const info = document.createElement('div');
         info.className = 'booking-info';
 
@@ -171,10 +168,7 @@ async function loadBookings() {
         info.appendChild(metaDiv);
         li.appendChild(info);
 
-        // only the booking's own owner sees a cancel button -- the backend already
-        // enforces this with a 403, but hiding the control entirely for other
-        // people's bookings is the correct UX rather than showing a button that
-        // would just fail.
+        // hide the cancel button for others' bookings rather than showing one that'd 403
         const isOwn = currentUser && booking.user_id === currentUser.id;
         if (isOwn) {
             const deleteBtn = document.createElement('button');
@@ -201,9 +195,7 @@ document.getElementById('booking-start-date').addEventListener('change', () => {
     document.getElementById('booking-end-date').value = document.getElementById('booking-start-date').value;
 });
 
-// Formats a Date using its LOCAL year/month/day -- never use toISOString() for this,
-// since that converts to UTC first and silently shifts the date by a day in any
-// timezone ahead of UTC (exactly the bug that caused 11 Sep to come out as 10 Sep).
+// local y/m/d, never toISOString() -- that converts to UTC and shifts the date in timezones ahead of it
 function formatLocalDate(date) {
     const y = date.getFullYear();
     const m = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -211,10 +203,7 @@ function formatLocalDate(date) {
     return `${y}-${m}-${d}`;
 }
 
-// list of YYYY-MM-DD strings for every day from startDateStr to endDateStr, inclusive.
-// Used to turn "10:00-15:00, 4 Sep - 7 Sep" into 4 separate same-time daily bookings,
-// rather than one continuous multi-day block that would (wrongly) occupy the room
-// overnight too.
+// every day from startDateStr to endDateStr inclusive -- one same-time booking per day, not one multi-day block
 function dateRange(startDateStr, endDateStr) {
     const dates = [];
     const current = new Date(`${startDateStr}T00:00:00`);
@@ -261,20 +250,14 @@ document.getElementById('booking-form').addEventListener('submit', async (e) => 
     const roomId = parseInt(document.getElementById('booking-room').value, 10);
     const title = document.getElementById('booking-title').value;
 
-    // Checked once, up front: an end time not after the start time would fail
-    // identically for every single day in the range, producing a wall of repeated
-    // identical error messages. Catching it here also means we never fall through
-    // to the reset-on-failure path with nothing useful to say.
+    // check once, up front -- otherwise this fails identically for every day in the range
     if (endTime <= startTime) {
         showError('Время окончания должно быть позже времени начала');
         return;
     }
 
     const allDays = dateRange(startDate, endDate);
-    // A single explicitly-chosen day is honored even if it's a weekend (someone doing
-    // this deliberately probably has a real event that day). A multi-day RANGE that
-    // happens to span a weekend skips Sat/Sun automatically, since those days are
-    // very unlikely to be intended just because they fall between two workdays.
+    // a single chosen day is honored even if it's a weekend; a multi-day range skips Sat/Sun
     const days = allDays.length > 1 ? allDays.filter((d) => !isWeekend(d)) : allDays;
     const skipped = allDays.length > 1 ? allDays.filter((d) => isWeekend(d)) : [];
 
@@ -345,9 +328,7 @@ document.getElementById('nl-form').addEventListener('submit', async (e) => {
     loadBookings();
 });
 
-// on page load, if a token is already stored, try to restore the session instead
-// of always dropping back to the login form -- an expired/invalid token just
-// falls through to showAuth() as before.
+// restore session on page load if a token is stored; falls through to showAuth() if invalid
 (async () => {
     if (getToken()) {
         currentUser = await fetchCurrentUser();
