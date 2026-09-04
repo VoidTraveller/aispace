@@ -21,7 +21,12 @@ def parse_booking_phrase(phrase: str, room_names: list[str]) -> dict:
       "Тихая комната"), or null if nothing clearly matches
     - date: string, ISO format YYYY-MM-DD, resolved from any relative reference
       ("завтра" = tomorrow, "послезавтра" = day after tomorrow) or weekday name
-      ("в пятницу", "на среду" = the next occurrence of that weekday on or after today)
+      ("в пятницу", "на среду" = the next occurrence of that weekday on or after today).
+      If the phrase describes a range of multiple days (e.g. "с понедельника по
+      пятницу"), this is the FIRST day of that range.
+    - end_date: string, ISO format YYYY-MM-DD, the LAST day of the range if the
+      phrase describes multiple days (e.g. "с понедельника по пятницу", "каждый
+      день на этой неделе"). If only one day is mentioned, set this equal to `date`.
     - start_time: string, 24h format HH:MM
     - duration_minutes: integer
     - title: string, the meeting purpose/description mentioned

@@ -62,3 +62,11 @@ class BookingOut(BaseModel):
 
 class NLBookingRequest(BaseModel):
     phrase: str
+
+
+class NLBookingResult(BaseModel):
+    """Returned instead of a single BookingOut when the phrase described a
+    multi-day range -- one booking gets created per weekday in the range."""
+    created: list[BookingOut]
+    skipped_weekends: list[str]
+    failed: list[str]

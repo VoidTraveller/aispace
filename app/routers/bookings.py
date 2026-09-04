@@ -1,6 +1,8 @@
 from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
@@ -8,7 +10,7 @@ from sqlalchemy import func
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models import Booking, Room, User
-from app.schemas import BookingOut, BookingCreate, NLBookingRequest
+from app.schemas import BookingOut, BookingCreate, NLBookingRequest, NLBookingResult
 
 from app.deepseek_client import parse_booking_phrase, DeepSeekParseError
 
@@ -96,7 +98,7 @@ def resolve_room(db: Session, room_query: str | None) -> Room:
     return room
 
 
-@router.post("/nl", response_model=BookingOut, status_code=status.HTTP_201_CREATED)
+@router.post("/nl", status_code=status.HTTP_201_CREATED)
 def create_booking_nl(
         payload: NLBookingRequest,
         db: Session = Depends(get_db),
@@ -114,6 +116,7 @@ def create_booking_nl(
 
     room_query = parsed.get("room_query")
     date_str = parsed.get("date")
+    end_date_str = parsed.get("end_date") or date_str
     start_time_str = parsed.get("start_time")
     duration = parsed.get("duration_minutes")
     title = parsed.get("title") or "Бронь"
@@ -123,14 +126,52 @@ def create_booking_nl(
                             "Не удалось извлечь все необходимые данные бронирования из фразы")
 
     try:
-        start_dt = datetime.fromisoformat(f"{date_str}T{start_time_str}:00")
+        start_time_of_day = datetime.strptime(start_time_str, "%H:%M").time()
+        first_day = datetime.fromisoformat(date_str).date()
+        last_day = datetime.fromisoformat(end_date_str).date()
     except ValueError:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "ИИ-сервис вернул нераспознаваемую дату или время")
 
     if not isinstance(duration, int) or duration <= 0 or duration > 480:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Длительность брони должна быть от 1 минуты до 8 часов")
 
-    end_dt = start_dt + timedelta(minutes=duration)
     room = resolve_room(db, room_query)
 
-    return create_booking_or_409(db, room.id, current_user.id, title, start_dt, end_dt)
+    if last_day < first_day:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Дата окончания раньше даты начала")
+
+    all_days = []
+    d = first_day
+    while d <= last_day:
+        all_days.append(d)
+        d += timedelta(days=1)
+
+    # single day -- identical shape/status to before multi-day support existed
+    if len(all_days) == 1:
+        start_dt = datetime.combine(first_day, start_time_of_day)
+        end_dt = start_dt + timedelta(minutes=duration)
+        return create_booking_or_409(db, room.id, current_user.id, title, start_dt, end_dt)
+
+    # multi-day range: one booking per weekday, same semantics as the manual booking form
+    days = [d for d in all_days if d.weekday() < 5]
+    skipped = [d.isoformat() for d in all_days if d.weekday() >= 5]
+
+    created = []
+    failed = []
+    for d in days:
+        start_dt = datetime.combine(d, start_time_of_day)
+        end_dt = start_dt + timedelta(minutes=duration)
+        try:
+            created.append(create_booking_or_409(db, room.id, current_user.id, title, start_dt, end_dt))
+        except HTTPException as e:
+            failed.append(f"{d.isoformat()}: {e.detail}")
+
+    if not created:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "; ".join(failed) or "Не удалось создать ни одной брони")
+
+    result = NLBookingResult(
+        created=[BookingOut.model_validate(b) for b in created],
+        skipped_weekends=skipped,
+        failed=failed,
+    )
+    return JSONResponse(status_code=status.HTTP_201_CREATED, content=jsonable_encoder(result))
