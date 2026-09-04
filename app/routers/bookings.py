@@ -26,6 +26,9 @@ def list_bookings(room_id: int | None = None, on_date: date | None = None, db: S
 
 
 def create_booking_or_409(db: Session, room_id: int, user_id: int, title: str, start_time, end_time) -> Booking:
+    if start_time < datetime.now():
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Нельзя создать бронь в прошлом")
+
     room = db.query(Room).filter(Room.id == room_id).first()
     if room is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Комната не найдена")

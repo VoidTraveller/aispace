@@ -1,5 +1,6 @@
 import os
 import subprocess
+from datetime import date, timedelta
 
 import psycopg2
 import pytest
@@ -71,6 +72,18 @@ def clean_db(setup_test_database):
 @pytest.fixture
 def client():
     return TestClient(app)
+
+
+def future_date(days_ahead=7):
+    """A YYYY-MM-DD string always `days_ahead` days from whenever the test actually
+    runs -- never a hardcoded calendar date, since a fixed future date silently
+    becomes a past date (and now gets rejected by the past-booking check) once
+    real time catches up to it."""
+    return (date.today() + timedelta(days=days_ahead)).isoformat()
+
+
+def past_date(days_ago=1):
+    return (date.today() - timedelta(days=days_ago)).isoformat()
 
 
 def register_and_login(client, email="tester@test.com"):
