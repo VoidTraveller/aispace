@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from unittest.mock import patch
 
 from app.deepseek_client import DeepSeekParseError
@@ -69,3 +70,57 @@ def test_nl_booking_room_not_found_returns_404(client):
 def test_nl_booking_requires_auth(client):
     response = client.post("/bookings/nl", json={"phrase": "anything"})
     assert response.status_code == 401
+
+
+def test_nl_booking_multiday_success(client, room):
+    """A 7-day window always contains exactly 5 weekdays + 2 weekend days,
+    regardless of which real day 'today' is -- avoids hardcoding a calendar date."""
+    token = register_and_login(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    start_day = future_date(7)
+    end_day = future_date(13)
+
+    fake_result = {
+        "room_query": "Test Room", "date": start_day, "end_date": end_day,
+        "start_time": "10:00", "duration_minutes": 60, "title": "Daily sync",
+    }
+    with patch("app.routers.bookings.parse_booking_phrase", return_value=fake_result):
+        response = client.post("/bookings/nl", headers=headers, json={"phrase": "anything"})
+
+    assert response.status_code == 201
+    body = response.json()
+    assert len(body["created"]) == 5
+    assert len(body["skipped_weekends"]) == 2
+    assert body["failed"] == []
+    for booking in body["created"]:
+        assert booking["room_id"] == room
+        assert booking["title"] == "Daily sync"
+
+
+def test_nl_booking_multiday_partial_conflict(client, room):
+    token = register_and_login(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    start_day = future_date(7)
+    end_day = future_date(13)
+
+    d = datetime.fromisoformat(start_day).date()
+    end_d = datetime.fromisoformat(end_day).date()
+    conflict_day = next(day for day in (d + timedelta(n) for n in range((end_d - d).days + 1)) if day.weekday() < 5)
+
+    client.post("/bookings", headers=headers, json={
+        "room_id": room, "title": "Existing",
+        "start_time": f"{conflict_day.isoformat()}T10:00:00", "end_time": f"{conflict_day.isoformat()}T11:00:00",
+    })
+
+    fake_result = {
+        "room_query": "Test Room", "date": start_day, "end_date": end_day,
+        "start_time": "10:00", "duration_minutes": 60, "title": "Daily sync",
+    }
+    with patch("app.routers.bookings.parse_booking_phrase", return_value=fake_result):
+        response = client.post("/bookings/nl", headers=headers, json={"phrase": "anything"})
+
+    assert response.status_code == 201
+    body = response.json()
+    assert len(body["created"]) == 4
+    assert len(body["failed"]) == 1
+    assert conflict_day.isoformat() in body["failed"][0]
