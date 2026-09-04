@@ -112,9 +112,35 @@ async function loadRooms() {
     rooms.forEach((room) => {
         const li = document.createElement('li');
         li.className = 'list-item';
-        const badgeClass = room.is_active ? 'badge-success' : 'badge-muted';
-        const badgeText = room.is_active ? 'доступна' : 'недоступна';
-        li.innerHTML = `<span>${room.name} · вместимость ${room.capacity}</span><span class="badge ${badgeClass}">${badgeText}</span>`;
+
+        // textContent, not innerHTML -- room names are now user-created, same reasoning as booking titles
+        const info = document.createElement('span');
+        info.textContent = `${room.name} · вместимость ${room.capacity}`;
+
+        const badge = document.createElement('span');
+        badge.className = `badge ${room.is_active ? 'badge-success' : 'badge-muted'}`;
+        badge.textContent = room.is_active ? 'доступна' : 'недоступна';
+
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = 'btn-secondary';
+        toggleBtn.textContent = room.is_active ? 'Деактивировать' : 'Активировать';
+        toggleBtn.addEventListener('click', async () => {
+            const res = await authFetch(`/rooms/${room.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_active: !room.is_active }),
+            });
+            if (res.ok) {
+                loadRooms();
+            } else {
+                const err = await res.json();
+                showError(formatError(err, 'Не удалось изменить статус комнаты'));
+            }
+        });
+
+        li.appendChild(info);
+        li.appendChild(badge);
+        li.appendChild(toggleBtn);
         list.appendChild(li);
 
         if (room.is_active) {
@@ -125,6 +151,31 @@ async function loadRooms() {
         }
     });
 }
+
+document.getElementById('room-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearError();
+
+    const payload = {
+        name: document.getElementById('room-name').value,
+        capacity: parseInt(document.getElementById('room-capacity').value, 10),
+    };
+
+    const response = await authFetch('/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+        const err = await response.json();
+        showError(formatError(err, 'Не удалось добавить комнату'));
+        return;
+    }
+
+    document.getElementById('room-form').reset();
+    loadRooms();
+});
 
 async function loadBookings() {
     const response = await fetch('/bookings');
