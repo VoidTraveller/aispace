@@ -112,6 +112,11 @@ input:focus, select:focus {
     box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
 }
 
+.time-select {
+    padding: 8px 6px;
+    width: auto;
+}
+
 button {
     padding: 8px 16px;
     border: none;

@@ -51,9 +51,9 @@
                         <input type="date" id="booking-end-date" required>
                     </label>
                     <label>Время (каждый день): с
-                        <input type="time" id="booking-start-time" required>
+                        <select id="booking-start-hour" class="time-select" required></select>:<select id="booking-start-minute" class="time-select" required></select>
                         до
-                        <input type="time" id="booking-end-time" required>
+                        <select id="booking-end-hour" class="time-select" required></select>:<select id="booking-end-minute" class="time-select" required></select>
                     </label>
                     <button type="submit" class="btn-primary">Забронировать</button>
                 </form>

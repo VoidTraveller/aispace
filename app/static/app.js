@@ -157,18 +157,49 @@ function dateRange(startDateStr, endDateStr) {
     return dates;
 }
 
+function isWeekend(dateStr) {
+    const day = new Date(`${dateStr}T00:00:00`).getDay();
+    return day === 0 || day === 6; // Sunday=0, Saturday=6
+}
+
+function populateTimeSelect(selectId, values, defaultValue) {
+    const select = document.getElementById(selectId);
+    values.forEach((v) => {
+        const option = document.createElement('option');
+        option.value = v;
+        option.textContent = v;
+        if (v === defaultValue) option.selected = true;
+        select.appendChild(option);
+    });
+}
+
+const HOURS = Array.from({ length: 24 }, (_, h) => h.toString().padStart(2, '0'));
+const MINUTES = ['00', '15', '30', '45'];
+
+populateTimeSelect('booking-start-hour', HOURS, '09');
+populateTimeSelect('booking-start-minute', MINUTES, '00');
+populateTimeSelect('booking-end-hour', HOURS, '10');
+populateTimeSelect('booking-end-minute', MINUTES, '00');
+
 document.getElementById('booking-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     clearError();
 
     const startDate = document.getElementById('booking-start-date').value;
     const endDate = document.getElementById('booking-end-date').value;
-    const startTime = document.getElementById('booking-start-time').value;
-    const endTime = document.getElementById('booking-end-time').value;
+    const startTime = `${document.getElementById('booking-start-hour').value}:${document.getElementById('booking-start-minute').value}`;
+    const endTime = `${document.getElementById('booking-end-hour').value}:${document.getElementById('booking-end-minute').value}`;
     const roomId = parseInt(document.getElementById('booking-room').value, 10);
     const title = document.getElementById('booking-title').value;
 
-    const days = dateRange(startDate, endDate);
+    const allDays = dateRange(startDate, endDate);
+    // A single explicitly-chosen day is honored even if it's a weekend (someone doing
+    // this deliberately probably has a real event that day). A multi-day RANGE that
+    // happens to span a weekend skips Sat/Sun automatically, since those days are
+    // very unlikely to be intended just because they fall between two workdays.
+    const days = allDays.length > 1 ? allDays.filter((d) => !isWeekend(d)) : allDays;
+    const skipped = allDays.length > 1 ? allDays.filter((d) => isWeekend(d)) : [];
+
     const failures = [];
 
     for (const day of days) {
@@ -191,8 +222,15 @@ document.getElementById('booking-form').addEventListener('submit', async (e) => 
         }
     }
 
+    const notes = [];
+    if (skipped.length > 0) {
+        notes.push(`пропущены выходные (${skipped.join(', ')})`);
+    }
     if (failures.length > 0) {
-        showError(`Забронировано не для всех дней — ${failures.join('; ')}`);
+        notes.push(`не удалось забронировать: ${failures.join('; ')}`);
+    }
+    if (notes.length > 0) {
+        showError(notes.join(' · '));
     }
 
     document.getElementById('booking-form').reset();
