@@ -1,4 +1,23 @@
-from conftest import register_and_login, future_date
+from sqlalchemy.exc import IntegrityError
+
+from conftest import register_and_login, future_date, TestSessionLocal
+from app.models import Room
+
+
+def test_room_name_unique_at_db_level():
+    """The app-level duplicate-name check alone doesn't cover a race between two
+    concurrent requests; this proves the DB constraint backs it up regardless."""
+    db = TestSessionLocal()
+    db.add(Room(name="Крыша", capacity=6))
+    db.commit()
+
+    db.add(Room(name="Крыша", capacity=8))
+    try:
+        db.commit()
+        assert False, "expected IntegrityError"
+    except IntegrityError:
+        db.rollback()
+    db.close()
 
 
 def test_create_room_success(client):

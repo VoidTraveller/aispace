@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -25,7 +26,11 @@ def create_room(
 
     room = Room(name=payload.name, capacity=payload.capacity, description=payload.description, is_active=True)
     db.add(room)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "Комната с таким названием уже существует")
     db.refresh(room)
     return room
 
