@@ -49,7 +49,9 @@ class BookingCreate(BaseModel):
 class BookingOut(BaseModel):
     id: int
     room_id: int
+    room_name: str
     user_id: int
+    user_name: str
     title: str
     start_time: datetime
     end_time: datetime

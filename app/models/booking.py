@@ -20,6 +20,14 @@ class Booking(Base):
     room: Mapped["Room"] = relationship(back_populates="bookings")
     user: Mapped["User"] = relationship(back_populates="bookings")
 
+    @property
+    def room_name(self) -> str:
+        return self.room.name
+
+    @property
+    def user_name(self) -> str:
+        return f"{self.user.first_name} {self.user.last_name}"
+
     __table_args__ = (
         CheckConstraint("end_time > start_time", name="check_end_after_start"),
         ExcludeConstraint(

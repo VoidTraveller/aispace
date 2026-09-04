@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 
 from app.database import get_db
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/bookings", tags=["bookings"])
 
 @router.get("", response_model=list[BookingOut])
 def list_bookings(room_id: int | None = None, on_date: date | None = None, db: Session = Depends(get_db)):
-    query = db.query(Booking)
+    query = db.query(Booking).options(joinedload(Booking.room), joinedload(Booking.user))
     if room_id is not None:
         query = query.filter(Booking.room_id == room_id)
     if on_date is not None:
