@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>AiSpace — Регистрация</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h1>Регистрация</h1>
+    <form id="register-form">
+        <input type="text" id="register-first-name" placeholder="Имя" required>
+        <input type="text" id="register-last-name" placeholder="Фамилия" required>
+        <input type="email" id="register-email" placeholder="Email" required>
+        <input type="password" id="register-password" placeholder="Пароль" required>
+        <button type="submit">Зарегистрироваться</button>
+    </form>
+    <p><a href="/">Уже есть аккаунт? Войти</a></p>
+    <div id="error-message" style="color:red;"></div>
+
+    <script src="/static/register.js"></script>
+</body>
+</html>

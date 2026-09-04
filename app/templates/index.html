@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>AiSpace — бронирование переговорных</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h1>AiSpace</h1>
+
+    <section id="auth-forms">
+        <h2>Вход</h2>
+        <form id="login-form">
+            <input type="email" id="login-email" placeholder="Email" required>
+            <input type="password" id="login-password" placeholder="Пароль" required>
+            <button type="submit">Войти</button>
+        </form>
+        <p><a href="/register">Нет аккаунта? Зарегистрироваться</a></p>
+    </section>
+
+    <section id="user-info" style="display:none;">
+        Вы вошли как <span id="user-name"></span>
+        <button id="logout-btn">Выйти</button>
+    </section>
+
+    <div id="app-section" style="display:none;">
+        <section>
+            <h2>Комнаты</h2>
+            <ul id="rooms-list"></ul>
+        </section>
+
+        <section>
+            <h2>Занятость</h2>
+            <ul id="bookings-list"></ul>
+        </section>
+
+        <section>
+            <h2>Забронировать вручную</h2>
+            <form id="booking-form">
+                <select id="booking-room" required></select>
+                <input type="text" id="booking-title" placeholder="Тема встречи" required>
+                <label>С: <input type="datetime-local" id="booking-start" required></label>
+                <label>По: <input type="datetime-local" id="booking-end" required></label>
+                <button type="submit">Забронировать</button>
+            </form>
+        </section>
+
+        <section>
+            <h2>Забронировать фразой</h2>
+            <form id="nl-form">
+                <input type="text" id="nl-phrase" placeholder="забронируй большую переговорку завтра с 14:00 на полтора часа, обсуждение релиза" size="60" required>
+                <button type="submit">Отправить</button>
+            </form>
+        </section>
+
+        <div id="error-message" style="color:red;"></div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
