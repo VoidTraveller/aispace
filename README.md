@@ -14,6 +14,21 @@ cp .env.example .env
 docker compose up --build
 ```
 
+На Windows (PowerShell, без Git Bash/WSL) команды немного отличаются:
+
+```powershell
+git clone <repo-url>
+cd aispace
+copy .env.example .env
+# JWT_SECRET_KEY сгенерировать так:
+python -c "import secrets; print(secrets.token_hex(32))"
+docker compose up --build
+```
+
+Само приложение и `entrypoint.sh` выполняются внутри Linux-контейнера, так
+что от ОС хоста (Windows/macOS/Linux) ничего не зависит — нужен только
+установленный Docker Desktop.
+
 Приложение доступно на `http://localhost:8000`, документация API — на
 `/docs`, проверка живости — `GET /health`.
 
